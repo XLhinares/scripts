@@ -2,9 +2,11 @@
 
 This directory contains a few utility scripts I've coded over time.
 
+I use Arch with the Caelestia shell, and haven't tested these on other installations, however most should still work.
+
 ## Structure:
 
-- `archiving`:
+- `archiving/`:
   - `rsync_script`: (WIP) Synchronizes my home folders to a backup location.
 - `apps/`:
   - `vconvert`: Converts videos between different formats with ffmpeg.
