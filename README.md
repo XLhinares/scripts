@@ -6,7 +6,7 @@ This directory contains a few utility scripts I've coded over time.
 
 - `caelestia/`: Contains the scripts that deal with the caelestia shell and client.
   - `livepaper`: Toggles between static and mp4 wallpaper.
-  - `tauon_scheme`: Generates a color scheme for Tauon based on Caelestia's.
+  - `scheme_tauon`: Generates a color scheme for Tauon based on Caelestia's.
   - `simple_scheme.py`: Generates a color scheme based on user-picked colors.
   - `wallpaper_posthook`: Manages the posthooks triggered on Caelestia WP change.
   - `wallpaper_select`: Opens Caelestia's wallpaper picker.
