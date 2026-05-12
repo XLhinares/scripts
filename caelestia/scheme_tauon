@@ -97,13 +97,13 @@ $SURFACE      menu icons
 
 # ---- TOP PANEL ----
 
-$SECONDARY      top panel
-$ON_SECONDARY   tab active background
-$SECONDARY      tab active text
-$CONTAINER  tab background
+$CONTAINER      top panel
+$SECONDARY      tab active background
+$ON_SECONDARY      tab active text
+$PRIMARY  tab background
 $ON_PRIMARY     tab text
-$ON_SECONDARY   tab over
-$SECONDARY      tab over text
+$SECONDARY   tab over
+$ON_SECONDARY      tab over text
 
 $SECONDARY      music vis background
 $SURFACE        music vis

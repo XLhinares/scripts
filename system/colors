@@ -11,11 +11,11 @@ print_colors() {
     echo -e "\\\033[$E<R>;<G>;<B>${R};194;0m  - Use RGB color"
     echo -e "\\\033[0m                  - Reset color"
 
-    for i in {30..38}; do 
+    for i in {30..38}; do
         printf "\033[${i}m$i\033[0m  "
     done
     echo "";
-    for i in {90..98}; do 
+    for i in {90..98}; do
         printf "\033[${i}m$i\033[0m  "
     done
     echo "";
@@ -43,7 +43,6 @@ print_commands() {
 if [[ "$1" == "preview" ]]; then
 
     print_colors
-    echo "Show full list: $0 full"
 ## Print all ANSII format escape codes.
 elif [[ "$1" == "full" ]]; then
 
