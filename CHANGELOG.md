@@ -1,3 +1,10 @@
+## 1.0.2
+
+    - readme: minor changes
+- refactor: split scripts into folders
+- caelestia: renamed more scripts for consistency
+- tauon: rename script for consistency
+
 ## 1.0.1
 
 - new: created "new_version" script
