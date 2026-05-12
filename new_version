@@ -1,0 +1,148 @@
+#!/bin/bash
+
+# An utility to simplify publishing new versions of a git project.
+
+set -e  # Exit on any error
+
+# Colors
+Y="\033[92m"
+R="\033[0m"
+show-help () {
+    echo "Utility for publishing new versions."
+    echo -e "Usage: ${Y}$0 <arg> <version> (current: $LAST_VERSION)$R"
+    echo -e ""
+    echo -e "Arguments:"
+    echo -e "  $Y[check]$R      Check that the code is valid."
+    echo -e "  $Y[update]$R     Update the code with the new version and generate change log."
+    echo -e "  $Y[publish]$R    Commit, push and merge to main branch."
+    echo -e "  $Y[full]$R       Runs the 3 previous command in order."
+}
+
+check-requirements () {
+    # --- 0. Verify required files exist ---
+    for file in CHANGELOG.md; do
+        if [ ! -f "$file" ]; then
+            echo "Error: $file not found in current directory"
+            exit 1
+        fi
+    done
+
+    # --- 1. Get last version number ---
+    # Extract the most recent version from CHANGELOG.md
+    LAST_VERSION=$(grep -m 1 '^## ' CHANGELOG.md | sed 's/^## //' | tr -d '\r')
+
+    # --- 2. Check arg and version argument ---
+    if [ -z "$1" ]; then
+        echo "❌ Version argument is required"
+        echo ""
+        show-help
+        exit 1
+    fi
+
+    VERSION="$1"
+
+    if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "❌ Version must be in X.Y.Z format"
+        echo ""
+        show-help
+        exit 1
+    fi
+}
+
+check-code () {
+    # --- 3. Verify we're on the dev branch ---
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$CURRENT_BRANCH" != "dev" ]; then
+        echo "❌ This script must be run from the 'dev' branch (current: $CURRENT_BRANCH)"
+        exit 1
+    fi
+    echo "✅ On the [dev] branch"
+
+    # --- 4. Check for code error ---
+    echo "🔍 Running code analysis..."
+
+    # Replace this echo with the actual analyzer
+    echo "No issues found" > code_analysis.log 2>&1 || true
+
+    # Check for warnings/errors
+    if ! grep -qiE "No issues found" code_analysis.log; then
+        echo "❌ Code analysis found issues:" >&2
+        echo "--- LOG START ---" >&2
+        cat code_analysis.log >&2
+        rm -f code_analysis.log
+        echo "--- LOG END ---" >&2
+        exit 1
+    fi
+    echo "✅ No code warnings or errors found"
+    rm -f code_analysis.log
+}
+
+update-code () {
+    # --- 5. Get commits since last version ---
+    if [ -n "$LAST_VERSION" ]; then
+        # Find the commit that added the last version to CHANGELOG.md
+        LAST_VERSION_COMMIT=$(git log --all --oneline --grep="version: $LAST_VERSION" -- CHANGELOG.md | head -1 | awk '{print $1}')
+        if [ -n "$LAST_VERSION_COMMIT" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" "$LAST_VERSION_COMMIT"..HEAD)
+        else
+            COMMITS=$(git log --pretty=format:"- %s")
+        fi
+    else
+        COMMITS=$(git log --pretty=format:"- %s")
+    fi
+
+    # Default if no commits found
+    [ -z "$COMMITS" ] && COMMITS="- No changes"
+
+    echo "✅ Parsed commits since last version"
+
+    # --- 6. Update CHANGELOG.md ---
+    NEW_ENTRY="## $VERSION
+
+    $COMMITS"
+    echo -e "$NEW_ENTRY\n\n$(cat CHANGELOG.md)" > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+
+    echo "✅ Updated CHANGELOG.md"
+
+    # --- 7. Update other files ---
+
+
+    echo "✅ Updated other files"
+}
+
+commit-and-push () {
+    # --- 8. Commit changes ---
+    git add CHANGELOG.md
+    git commit -m "version: $VERSION"
+    git push || { echo "❌ Failed to push to dev"; exit 1; }
+
+    # --- 9. Merge dev into main ---
+    git checkout main
+    git merge dev --no-edit
+    git push || { echo "❌ Failed to push to main"; exit 1; }
+    git checkout dev
+
+    echo "✅ Successfully released version: $VERSION"
+}
+
+if [[ $1 == "check" ]]; then
+    check-requirements $2
+    check-code
+
+elif [[ $1 == "update" ]]; then
+    check-requirements $2
+    update-code
+
+elif [[ $1 == "publish" ]]; then
+    check-requirements $2
+    commit-and-push
+
+elif [[ $1 == "full" ]]; then
+    check-requirements $2
+    check-code
+    update-code
+    commit-and-push
+
+else
+    show-help
+fi
