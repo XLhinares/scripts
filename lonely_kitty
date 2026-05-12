@@ -1,0 +1,122 @@
+#!/bin/bash
+
+# A small script that makes lonely kitties fly!
+# It works by watching windows opening, closing or changing workspace.
+# If one of these operations results in a kitty terminal being the only window in its workspace, then it's set to be floating; otherwise sets the kitty to tiled.
+#
+# Has since then been updated to include custom behaviors for the following apps:
+# - kitty
+# - tauon
+# - krita
+
+GOLD="\e[38;2;252;194;0m"
+YELLOW="\e[93m"
+GREEN="\e[32m"
+RED="\e[31m"
+GREY="\e[37m"
+BOLD="\e[1m"
+RESET="\e[0m"
+
+KITTY_SIZE=792
+TAUON_SIZE=$(($KITTY_SIZE*3/2))
+KRITA_HEIGHT=$((1440-32*2))
+KRITA_WIDTH=$(($KRITA_HEIGHT*16/9))
+
+handle() {
+  case $1 in
+    openwindow*|closewindow*|workspace*)
+
+    echo ""
+    echo "Handling new event"
+
+      # Get current workspace and window count
+      WS=$(hyprctl activeworkspace -j )
+      sleep 0.1
+      WS_ID=$(echo "$WS" | jq '.id')
+      WINDOW_COUNT=$(echo "$WS" | jq '.windows')
+      WS_WINDOWS=$(hyprctl clients -j | jq --argjson id "$WS_ID" '.[] | select(.workspace.id == $id)')
+      WS_KITTY=$(echo "$WS_WINDOWS" | jq -r 'select(.class == "kitty") | .address')
+      WS_OTHERS=$(echo "$WS_WINDOWS" | jq -r 'select(.class != "kitty") | .address')
+
+      echo "$WINDOW_COUNT windows in workspace $WS_ID"
+
+      ## WINDOW IS LONELY -----------------------------------------------------
+
+      if [ "$WINDOW_COUNT" -eq 1 ]; then
+        CLASS=$(echo "$WS_WINDOWS" | jq -r '.class')
+        ADDRESS=$(echo "$WS_WINDOWS" | jq -r '.address')
+
+        # Kitty handling
+        # Force lonely kitty to floats
+        if [[ $CLASS == "kitty" ]]; then
+          echo -e "> Kitty $addr is ${RED}lonely$RESET..."
+          hyprctl dispatch setfloating "address:$ADDRESS"
+          hyprctl dispatch resizeactive exact $KITTY_SIZE $KITTY_SIZE
+          hyprctl dispatch centerwindow
+          hyprctl dispatch setprop "address:$ADDRESS" border_color 4F0707
+          hyprctl dispatch setprop "address:$ADDRESS" border_size 4
+
+        ## Tauon handling
+        elif [[ $CLASS == "com.github.taiko2k.tauonmb" ]]; then
+          echo -e "> Tauon $addr is ${RED}lonely$RESET..."
+          hyprctl dispatch setfloating "address:$ADDRESS"
+          hyprctl dispatch resizeactive exact $TAUON_SIZE $KITTY_SIZE
+          hyprctl dispatch setprop "address:$ADDRESS" border_size 4
+          hyprctl dispatch centerwindow
+
+        ## Krita handling
+        elif [[ $CLASS == "krita" ]]; then
+          echo -e "> Krita $addr is ${RED}lonely$RESET..."
+          hyprctl dispatch setfloating "address:$ADDRESS"
+          hyprctl dispatch resizeactive exact $KRITA_WIDTH $KRITA_HEIGHT
+          hyprctl dispatch setprop "address:$ADDRESS" border_size 4
+          hyprctl dispatch centerwindow
+
+        # Other windows handling (no borders)
+        else
+          [[ -z "$ADDRESS" ]] && continue # Skip if there are no windows
+          echo -e "> Not-kitty $ADDRESS is ${RED}lonely$RESET..."
+          hyprctl dispatch setprop "address:$ADDRESS" border_size 2
+        fi
+
+      ## WINDOW HAS FRIENDS ---------------------------------------------------
+
+      elif [ "$WINDOW_COUNT" -gt 1 ]; then
+
+        # Force all kitty windows on this workspace to tile
+        echo "$WS_WINDOWS" | jq -c '.' | while read -r window; do
+          [[ -z "$window" ]] && continue # Skip if there are no windows
+
+          CLASS=$(echo "$window" | jq -r '.class')
+          ADDRESS=$(echo "$window" | jq -r '.address')
+
+          # Re-tile windows that fly when lonely
+          if [[ $CLASS == "kitty" ]]; then
+            hyprctl dispatch settiled "address:$ADDRESS"
+          elif [[ $CLASS == "com.github.taiko2k.tauonmb" ]]; then
+            hyprctl dispatch settiled "address:$ADDRESS"
+          fi
+
+          echo -e "> Window $ADDRESS has ${GREEN}friends$RESET!"
+          hyprctl dispatch setprop "address:$ADDRESS" border_size 2
+        done
+
+      fi
+      ;;
+  esac
+}
+
+
+
+## Starts the lonely kitty handling service.
+if [[ "$1" == "start" ]]; then
+
+    echo "Looking for lonely kitties..."
+    socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock | while read -r line; do
+      handle "$line"
+    done
+
+else
+    echo "A small script that makes lonely kitties fly!"
+    ~/.scripts/script_help $0
+fi

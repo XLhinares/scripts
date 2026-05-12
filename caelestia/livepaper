@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# DESCRIPTION:
+# Utility letting me switch between static and live wallpaper.
+# Contains a function to look-up a live wallpapers from preview
+# that can be used as a post-hook for caelestia.
+
+# NOTES:
+# - JSON config is created on the first run (unless existing).
+# - Need to set correct live and static folders paths in the json config.
+# - The .mp4 wallpapers need to have .png previews with the same name. (NO other format is supported)
+# - .png previews can be generated with `caelestia-livepaper generate-previews`.
+# - To set the post hook, find the wallpaper postHook field in caelestia's `cli.json` and set it to:
+#       `"<path_to_this_script> post-hook \"$WALLPAPER_PATH\""`
+
+# REQUIREMENTS:
+# - mpvpaper
+# - ffmpeg
+# - caelestia-cli
+# - jq
+
+# DATA ========================================================================
+# =============================================================================
+
+# Colors
+Y="\033[92m"
+R="\033[0m"
+
+# Config
+CONFIG="$0.data.json"
+CAELESTIA_CONFIG="$HOME/.config/caelestia/shell.json"
+CURRENT_WP=$(caelestia shell wallpaper get)
+
+# Ensure data file exists, create if needed.
+# The script will crash if any of the data is missing or invalid.
+# To fix that, the first .jpg/.png in a folder is selected by default.
+if [[ ! -f "$CONFIG" ]]; then
+    DEFAULT_FOLDER_STATIC="$HOME/Pictures/Wallpapers/"
+    DEFAULT_FOLDER_LIVE="$HOME/Videos/Wallpapers/"
+    DEFAULT_WP_STATIC=$(find "$DEFAULT_FOLDER_STATIC" -maxdepth 1 -type f -regex ".*\.\(jpg\|png\)$" -print -quit)
+    DEFAULT_WP_LIVE=$(find "$DEFAULT_FOLDER_LIVE" -maxdepth 1 -type f -name "*.png" -print -quit)
+
+    echo "{
+    \"folder_static\": \"$DEFAULT_FOLDER_STATIC\",
+    \"folder_live\": \"$DEFAULT_FOLDER_LIVE\",
+    \"last_static\": \"$DEFAULT_WP_STATIC\",
+    \"last_live\": \"$DEFAULT_WP_LIVE\"
+}" > "$CONFIG"
+    echo "Created default config file."
+fi
+
+# Data
+FOLDER_STATIC=$(jq -r '.folder_static' $CONFIG)
+FOLDER_LIVE=$(jq -r '.folder_live' $CONFIG)
+WP_STATIC=$(jq -r '.last_static' $CONFIG)
+WP_LIVE=$(jq -r '.last_live' $CONFIG)
+
+LIVE_IS_ENABLED=$(jq -r --arg folder_live "$FOLDER_LIVE" '.paths.wallpaperDir == $folder_live' "$CAELESTIA_CONFIG")
+
+# FUNCTIONS ===================================================================
+# =============================================================================
+
+## Post hook (after wallpaper change).
+##
+## It takes a .png file path as argument.
+## Takes not of the new wallpaper and tries to make it live if LIVE_IS_ENABLED.
+wallpaper_post_hook () {
+    if [[ $LIVE_IS_ENABLED == false ]]; then
+        # Takes note of the wallpaper so it can be restored on toggle.
+        jq ".last_static = \"$1\"" "$CONFIG" > tmp.json && mv tmp.json "$CONFIG"
+
+    else
+        # Look for a mp4 file with the same name as the png.
+        local file_as_mp4=$(echo "$1" | sed "s/.png/.mp4/")
+        if [[ -f $file_as_mp4 ]]; then
+            mpvpaper --mpv-options "--loop-file --panscan=1.0 input-ipc-server=/tmp/mpv-socket" ALL $file_as_mp4 &> /dev/null &
+            disown
+        else
+            echo "$file_as_mp4 not found, using static preview..."
+        fi
+
+        # Takes note of the wallpaper so it can be restored on toggle.
+        jq ".last_live = \"$1\"" "$CONFIG" > tmp.json && mv tmp.json "$CONFIG"
+    fi
+}
+
+enable_livepaper () {
+    echo "Switching to live wallpaper"
+    jq ".paths.wallpaperDir = \"$FOLDER_LIVE\"" "$CAELESTIA_CONFIG" > tmp.json && mv tmp.json "$CAELESTIA_CONFIG"
+
+    LIVE_IS_ENABLED=true
+    caelestia shell wallpaper set "$WP_LIVE"
+}
+
+disable_livepaper () {
+    echo "Switching to static wallpaper"
+    pkill mpvpaper
+    jq ".paths.wallpaperDir = \"$FOLDER_STATIC\"" "$CAELESTIA_CONFIG" > tmp.json && mv tmp.json "$CAELESTIA_CONFIG"
+
+    LIVE_IS_ENABLED=false
+    caelestia shell wallpaper set "$WP_STATIC"
+}
+
+# If the livepaper is on, makes it static; if it's static, makes it live.
+toggle_livepaper () {
+    if [[ $LIVE_IS_ENABLED == true ]]; then
+        disable_livepaper
+    else
+        enable_livepaper
+    fi
+}
+
+# For each .mp4 video in a folder, extracts the first frame as a .png file.
+generate_static_previews () {
+    for file in "$FOLDER_LIVE"*.mp4; do
+
+        local file_as_png=$(echo "$file" | sed "s/.mp4/.png/")
+        # Skip if no files match the glob or if there's already a preview
+        [[ -e "$file" ]] || continue
+        if [[ -f "$file_as_png" ]]; then
+            echo "Preview found for $file. Skipping..."
+            continue
+        fi
+
+        ffmpeg -y -i $file -vf "select=eq(n\,0)" -frames:v 1 -update 1 "$file_as_png"
+    done
+}
+
+# EXECUTION ===================================================================
+# =============================================================================
+
+## Whether caelestia is using live wallpaper (and not static ones)
+if [[ "$1" == "is-enabled" ]]; then
+    echo "$LIVE_IS_ENABLED"
+
+## Switches to using live wallpaper
+elif [[ "$1" == "enable" ]]; then
+    enable_livepaper
+
+## Switches to using static wallpaper
+elif [[ "$1" == "disable" ]]; then
+    disable_livepaper
+
+## Silently sets the given video as wallpaper and disown the process.
+elif [[ "$1" == "toggle" ]]; then
+    toggle_livepaper
+
+## Loads the live wallpaper if needed.
+elif [[ "$1" == "posthook" ]]; then
+    wallpaper_post_hook "$CURRENT_WP"
+
+## Manually change the wallpaper.
+## !!! Do not use as a post-hook or you'll be stuck in a loop !!!
+elif [[ "$1" == "manual-set" ]]; then
+    caelestia shell wallpaper set "$2"
+    wallpaper_post_hook "$2"
+
+## Generate previews for all the videos in the $FOLDER_LIVE folder.
+elif [[ "$1" == "generate-previews" ]]; then
+    generate_static_previews
+
+else
+    echo -e "A script to set up video wallpaper with matching caelestia theme."
+    echo -e "Usage: ${Y}livepaper [argument]$R"
+    echo -e ""
+    echo -e "Arguments:"
+    echo -e "  $Y[is-enabled]$R         Whether we're currently using live wallpaper"
+    echo -e "  $Y[enable]$R             Switches to using live wallpaper"
+    echo -e "  $Y[disable]$R            Switches to using static wallpaper"
+    echo -e "  $Y[toggle]$R             Switches between live and static wallpaper"
+    echo -e "  $Y[restore]$R            Rerun the post-hook on the current wallpaper"
+    echo -e "  $Y[posthook]$R          Applies effect to the current WP (ie. loading video file.)"
+    echo -e "  $Y[manual-set] <path> $R Manually changes the wallpaper (do NOT use as post hook!!!)"
+    echo -e "  $Y[generate-previews]$R  Generate previews for the live wallpapers"
+fi

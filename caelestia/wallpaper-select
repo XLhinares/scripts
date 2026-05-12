@@ -1,0 +1,8 @@
+#!/usr/bin/sh
+
+# This simply opens the Caelestia launcher and type ">wallpaper"
+# It is used so I can open the wallpaper changer by pressing a button.
+
+caelestia shell drawers toggle launcher
+sleep .2
+wtype ">wallpaper "

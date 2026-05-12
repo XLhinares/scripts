@@ -1,0 +1,9 @@
+#!/bin/bash
+
+CURRENT_LAYOUT=$(fcitx5-remote -n)
+
+if [[ $CURRENT_LAYOUT == "keyboard-us" ]]; then
+	fcitx5-remote -s "chewing"
+else
+	fcitx5-remote -s "keyboard-us"
+fi

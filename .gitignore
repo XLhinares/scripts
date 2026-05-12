@@ -1,0 +1,7 @@
+# Hide the scripts I'm not proud of...
+backup
+unzip_folder
+
+# Ignore data files.
+*.data
+*.json

@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# VARIABLES -------------------------------------------------------------------
+
+E="\e[1m\e[33m" # Emphasize
+R="\e[0m"       # Reset
+
+# Current timestamp in seconds
+CURRENT_TIME=$(date +%s)
+MIN_DELAY_BETWEEN_CHECKS=$((2 * 24 * 3600))
+
+# LOAD DATA WITH SAFEGUARDS ---------------------------------------------------
+
+# Create the data file if it doesn't exist.
+if [ ! -f $0.data ]; then
+   touch $0.data
+fi
+
+LAST_CHECK=$(cat $0.data)
+
+# If there is no last known check, assign it to 0 so a new check happens.
+if [ -z "$LAST_CHECK" ]; then
+    LAST_CHECK=0
+fi
+
+# LOGIC -----------------------------------------------------------------------
+
+((TIME_SINCE_LAST_CHECK=CURRENT_TIME - LAST_CHECK))
+
+((TIME_UNTIL_NEXT_CHECK=MIN_DELAY_BETWEEN_CHECKS - TIME_SINCE_LAST_CHECK))
+
+((NEED_UPGRADE= TIME_UNTIL_NEXT_CHECK < 0))
+
+display_time_since_last_update(){
+    if [[ LAST_CHECK -eq 0 ]]; then
+        echo "No previous check." >&2
+    elif [[ NEED_UPGRADE -eq 1 ]]; then
+        ((h=$TIME_SINCE_LAST_CHECK/3600))
+        ((m=($TIME_SINCE_LAST_CHECK%3600)/60))
+        ((s=$TIME_SINCE_LAST_CHECK%60))
+        printf "Time since last check: %02dh%02dm%02ds\n" $h $m $s >&2
+    else
+        ((h=$TIME_UNTIL_NEXT_CHECK/3600))
+        ((m=($TIME_UNTIL_NEXT_CHECK%3600)/60))
+        ((s=$TIME_UNTIL_NEXT_CHECK%60))
+        printf "Time until next check: %02dh%02dm%02ds\n" $h $m $s >&2
+    fi
+}
+
+## Runs the system upgrade if needed.
+if [[ "$1" == "check" ]]; then
+    display_time_since_last_update
+
+    if [[ $NEED_UPGRADE != 1 ]]; then
+        echo "Skipping update."
+        exit
+    fi
+
+    # Pacman
+    echo -e "Running $E\`sudo pacman -Syu\`$R" >&2
+    sudo pacman -Syu
+
+    # Yay
+    echo -e "Running $E\`yay -Syu\`$R" >&2
+    yay -Syu
+
+    # Flatpak
+    echo -e "Running $E\`flatpak upgrade\`$R" >&2
+    flatpak upgrade
+
+    # Done!
+    echo -e "${E}All done$R" >&2
+    echo "$CURRENT_TIME" > $0.data
+
+    # Reboot (optional)
+    REBOOT="y"
+    read -p "Reboot now? [Y\n] " REBOOT
+    if [[ -z $REBOOT ]] || [[ "$USER_CONFIRMATION" =~ ^[Yy]$ ]]; then
+        echo "Rebooting..."
+        reboot
+    else
+        echo "Skipping reboot. Some upgrades may not work properly."
+    fi
+
+## Opens a terminal and runs the system upgrade if needed.
+elif [[ "$1" == "terminal" ]]; then
+    if [[ NEED_UPGRADE -eq 1 ]]; then
+        kitty sh $0 check
+    fi
+
+## Default behavior: Shows help
+else
+    echo
+    ~/.scripts/script_help $0
+fi

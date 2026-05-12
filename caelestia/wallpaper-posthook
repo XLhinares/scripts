@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Description:
+# The various postHook scripts triggered on wallpaper change.
+
+/home/xavier/.scripts/caelestia/livepaper posthook
+python /home/xavier/.scripts/caelestia/simple_scheme.py generate-from-wp
+/home/xavier/.scripts/caelestia/scheme-tauon

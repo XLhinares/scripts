@@ -1,0 +1,30 @@
+# !/bin/bash
+
+# Note:
+# To make this script possible to run with just a button,
+# I added the `ufw` commands to /etc/sudoers.d/weylus.
+
+if [[ $1 == "start" ]]; then
+	sudo -n /usr/bin/ufw allow 1701/tcp &> /dev/null &
+	sudo -n /usr/bin/ufw allow 9001/tcp &> /dev/null &
+	weylus --no-gui &> /dev/null &
+	LAN_IP=$(ip addr | grep -oP '(?<=inet\s)192\.168\.(\d+)\.(\d+)')
+	echo "Connect at: $LAN_IP:1701"
+
+elif [[ $1 == "stop" ]]; then
+	pkill weylus
+	sudo -n /usr/bin/ufw delete allow 1701/tcp &> /dev/null &
+	sudo -n /usr/bin/ufw delete allow 9001/tcp &> /dev/null &
+	echo "Weylus stopped successfully"
+
+elif [[ $1 == "is-enabled" ]]; then
+	pgrep -x weylus > /dev/null && echo true || echo false
+
+else
+	echo "Weylus+UFW utility"
+	echo "Usage: weylus [arg]"
+	echo "Arguments:"
+	echo "	[start]         Allow the relevant TCP ports and start Weylus"
+	echo "	[stop]          Disallow the relevant TCP ports and stop Weylus"
+	echo "	[is-enabled]    Whether Weylus is currently running"
+fi

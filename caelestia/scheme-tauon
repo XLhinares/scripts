@@ -1,0 +1,182 @@
+#!/bin/bash
+
+# DESCRIPTION:
+# Creates a Tauon theme based on the colors of the Caelestia shell.
+
+# NOTES:
+# This generates a `caelestia.ttheme` file in the Tauon theme directory.
+# After the first generation, you should select that theme,
+# However, Tauon doesn't watch for file changes so you will need to manually reload it to actually get the changes (F10 by default).
+
+# USAGE:
+# In your `~/.config/caelestia/cli.json` you need to have:
+# {
+#     "wallpaper": {
+#         "postHook": "<path_to_this_script>"
+#     }
+# }
+
+# =================
+
+# FILES
+
+CAELESTIA_THEME_DIR="$HOME/.local/state/caelestia"
+TAUON_THEME_DIR="$HOME/.var/app/com.github.taiko2k.tauonmb/data/TauonMusicBox/theme"
+
+CAELESTA_THEME_FILE="$CAELESTIA_THEME_DIR/scheme.json"
+TAUON_THEME_FILE="$TAUON_THEME_DIR/caelestia.ttheme"
+
+# COLORS
+
+THEME_MODE=$(jq -r '.mode' $CAELESTA_THEME_FILE)
+if [[ $THEME_MODE == "dark" ]]; then
+    MODE="dark-mode"
+else
+    MODE="light-mode"
+fi
+
+ERROR=$(jq -r '.colours.error' $CAELESTA_THEME_FILE)
+SURFACE=$(jq -r '.colours.surface' $CAELESTA_THEME_FILE)
+ON_SURFACE=$(jq -r '.colours.onSurface' $CAELESTA_THEME_FILE)
+CONTAINER=$(jq -r '.colours.surfaceContainer' $CAELESTA_THEME_FILE)
+ON_CONTAINER=$(jq -r '.colours.onSurfaceContainer' $CAELESTA_THEME_FILE)
+PRIMARY=$(jq -r '.colours.primary' $CAELESTA_THEME_FILE)
+ON_PRIMARY=$(jq -r '.colours.onPrimary' $CAELESTA_THEME_FILE)
+SECONDARY=$(jq -r '.colours.secondary' $CAELESTA_THEME_FILE)
+ON_SECONDARY=$(jq -r '.colours.onSecondary' $CAELESTA_THEME_FILE)
+
+THEME="# -----------------------------------------------------
+# Tauon Music Box Theme File - Caelestia
+# ------------------------------------------------------
+# Made by: XLhinares
+# Source:
+
+# $MODE
+
+# ---- Backgrounds ----
+
+$SURFACE      player background
+$SURFACE      queue panel
+$SURFACE      gallery background
+
+# ---- TRACK PANEL (MAIN) ----
+
+$SURFACE        tracklist panel
+$ON_SURFACE     track line
+$ON_SURFACE     track time
+$ON_SURFACE     track index
+$ON_SURFACE     track artist
+$ON_SURFACE     track album
+
+$ERROR      track missing
+
+$ERROR          fav line
+$SECONDARY      folder line
+$SECONDARY      folder title
+
+$SECONDARY        playing highlight
+$ON_SECONDARY      track playing
+$ON_SECONDARY      time playing
+$ON_SECONDARY      index playing
+$ON_SECONDARY      artist playing
+$ON_SECONDARY      album playing
+
+$SECONDARY      select highlight
+$SECONDARY     gallery highlight
+
+$ON_SURFACE     column bar background
+
+# ---- MENU ----
+
+$ON_SURFACE      menu background
+$SECONDARY      menu highlight
+$SURFACE      menu border
+$SURFACE      menu text
+$ON_SURFACE      menu disable text
+$SURFACE      menu icons
+
+# ---- TOP PANEL ----
+
+$SECONDARY      top panel
+$ON_SECONDARY   tab active background
+$SECONDARY      tab active text
+$CONTAINER  tab background
+$ON_PRIMARY     tab text
+$ON_SECONDARY   tab over
+$SECONDARY      tab over text
+
+$SECONDARY      music vis background
+$SURFACE        music vis
+
+$SECONDARY      window buttons background
+$SURFACE        window buttons off
+$SURFACE        window buttons on
+$SECONDARY      window buttons icon over
+
+# ---- Bottom Panel ----
+
+$SECONDARY        bottom panel
+$ON_SECONDARY       buttons active
+$CONTAINER    buttons off
+$ON_SECONDARY       buttons over
+
+$ON_SECONDARY     playing time
+$ON_SECONDARY     seek bar
+$CONTAINER      seek bg
+
+$CONTAINER      volume bg
+$ON_SECONDARY     volume bar
+
+$SECONDARY      scroll bar
+
+$CONTAINER        mode off
+$ON_SECONDARY     mode over
+$ON_SECONDARY     mode on
+
+$ON_SECONDARY          bottom title
+
+# ---- Side Panel ----
+
+$SURFACE        side panel
+$ON_SURFACE     title info
+$ON_SURFACE     extra info
+$SECONDARY      art border
+
+# ---- Mini Mode ----
+
+$SURFACE        mini bg
+$SECONDARY      mini border
+$SECONDARY          mini text 1
+
+# ---- Artist Info ----
+
+$SECONDARY      artist bio background
+$ON_SURFACE     artist bio text
+
+# ---- Misc ----
+
+$SECONDARY      window frame
+
+# ---- Dialog Box ----
+
+$SURFACE        box background
+$SECONDARY      box border
+
+$ON_SURFACE     box title text
+$ON_SURFACE     box text label
+
+$ON_SURFACE     box text normal
+$ON_SURFACE     box sub text
+$ON_SURFACE     box input text
+$SECONDARY      box text border
+
+$ON_SURFACE     box button text normal
+$ON_PRIMARY     box button text highlight
+$SURFACE        box button background normal
+$ON_SECONDARY      box button background highlight
+$SECONDARY      box button border
+"
+
+echo "$THEME" > "$TAUON_THEME_FILE"
+
+echo "Successfully generated Tauon theme."

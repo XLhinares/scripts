@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Requirements:
+# - mpvpaper
+# - ffmpeg
+# - caelestia-cli
+
+# Colors
+Y="\033[92m"
+R="\033[0m"
+
+# Files paths
+CAELESTIA_FALLBACK="$0.previous"
+WP_LIVE="$0.live"
+WP_STATIC="$0.static.png"
+
+backup_static_wp () {
+    # If there is no previous instance, back up the static WP used by caelestia 
+    if ! pgrep -x "mpvpaper" >/dev/null; then
+        caelestia shell wallpaper get > $CAELESTIA_FALLBACK
+    fi
+}
+
+set_wp () {
+    # Set the first frame of the video as caelestia WP to get dynamic theme
+    ffmpeg -y -i $1 -vf "select=eq(n\,0)" -frames:v 1 -update 1 $WP_STATIC
+    caelestia shell wallpaper set $WP_STATIC
+
+    # Actually enable the requested wallpaper
+    mpvpaper --mpv-options "--loop-file --panscan=1.0 input-ipc-server=/tmp/mpv-socket" ALL $1
+
+    # Remember the live wallpaper
+    echo "$1" > $WP_LIVE
+}
+
+## Sets the given video as wallpaper
+if [[ "$1" == "set" ]]; then
+
+    backup_static_wp
+    set_wp $2
+
+## Silently sets the given video as wallpaper and disown the process.
+elif [[ "$1" == "silent-set" ]]; then
+
+    backup_static_wp &> /dev/null
+    set_wp $2 &> /dev/null &
+    disown
+
+## Silently sets the given video as wallpaper and disown the process.
+elif [[ "$1" == "restore" ]]; then
+
+    if [[ ! -f $WP_LIVE ]]; then
+        echo "No live wallpaper to restore. Aborting."
+        exit
+    fi 
+    WP_TO_RESTORE=$(cat $WP_LIVE)
+    set_wp $WP_TO_RESTORE
+
+## Play/Pause the video wallpaper
+elif [[ "$1" == "pause" ]]; then
+
+    echo 'cycle pause' | socat - /tmp/mpv-socket
+    
+## Kills the video wallpaper
+elif [[ "$1" == "stop" ]]; then
+
+    pkill mpvpaper
+    if [ -f $CAELESTIA_FALLBACK ]; then
+        PREVIOUS_WP=$(cat $CAELESTIA_FALLBACK)
+        caelestia shell wallpaper set "$PREVIOUS_WP"
+    fi
+
+else
+    echo -e "A script to set up video wallpaper with matching caelestia theme."
+    echo -e "Usage: ${Y}livepaper [argument]$R"
+    echo -e ""
+    echo -e "Arguments:"
+    echo -e "  $Y[set] <path>$R         Sets the video at <path> as wallpaper"
+    echo -e "  $Y[silent-set] <path>$R  Same at [set] but silent"
+    echo -e "  $Y[restore]$R            Attempts to [set] the last know live wallpaper"
+    echo -e "  $Y[pause]$R              Pause/Resume the wallpaper"
+    echo -e "  $Y[stop]$R               Stops the wallpaper and restore the previous one"
+fi

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+## .mp4 to .gif
+if [[ "$1" == "mp4togif" ]]; then
+    ffmpeg -i $2.mp4 -vf "fps=12,-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 $2.gif
+    
+## .gif to .mp4
+elif [[ "$1" == "giftomp4" ]]; then
+    ffmpeg -i $2.gif -vf "-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" $2.mp4
+    
+## .mp4 to .gif (UW)
+elif [[ "$1" == "mp4togifuw" ]]; then
+    ffmpeg -i $2.mp4 -vf "fps=12,scale=3440:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 $2.gif
+
+## .gif to .mp4 (UW)
+elif [[ "$1" == "giftomp4uw" ]]; then
+    ffmpeg -i $2.gif -vf "scale=3440:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" $2.mp4
+    
+else
+    echo "A few video conversion functions using ffmpeg"
+    echo ""
+    ~/.scripts/script_help help ~/.scripts/vconvert
+fi

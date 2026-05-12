@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# A utility for bash scripts controlled by if and elif blocks.
+# Display help and add autocompletion / alias.
+
+
+# COLORS
+COL_WIDTH="12"
+YELLOW="\033[93m"
+RESET="\033[0m"
+
+## Show help
+show_help(){
+    # Ensure the file exists
+    if [[ ! -f "$1" ]]; then
+        echo "Error: File '$1' not found."
+        return 1
+    fi
+
+    printf "Usage: $YELLOW$1 [command]$RESET"
+    echo ""
+    echo ""
+	echo "Commands:"
+    # Using awk with better string handling
+    awk -v yellow="$YELLOW" -v reset="$RESET" -v width="$COL_WIDTH" '
+    # If the line starts with ##, save the comment (strip the ## and space)
+    /^## / {
+        helpMessage = substr($0, 4);
+        next;
+    }
+
+    # If the line is an if/elif for $1, and we have a saved message
+    /^(if|elif) \[\[ "\$1" == ".*" \]\]; then/ {
+        if (helpMessage != "") {
+            # Extract command: find the first string between double quotes
+            # We split by " and take the 4th element (standard for your structure)
+            split($0, parts, "\"");
+            cmd = parts[4];
+
+            printf "  %s%-"width"s%s %s\n", yellow, cmd, reset, helpMessage;
+            helpMessage = ""; # Reset to avoid accidental reuse
+        }
+    }
+    ' "$1"
+}
+
+# Adds autocompletions for scripts by looking up arguments looking like
+# "'/^(if|elif) \[\[ "\$1" == ".*" \]\]; then/"
+# If a second argument is provided, it is used as alias.
+add_autocomplete(){
+    local script_path=$(realpath "$1")
+    local script_name=$(basename "$script_path")
+
+    if [[ ! -z $2 ]]; then
+        script_name=$2
+        alias $2="$script_path"
+    fi
+
+    local commands=$(awk -F'"' '/^(if|elif) \[\[ "\$1" == ".*" \]\]; then/ {printf "%s ", $4}' "$script_path")
+    complete -W "$commands" "$script_name"
+}
+
+## Shows help on no argument
+if [[ -z $1 ]]; then
+
+    printf "Usage: $YELLOW$0 [arg] $RESET"
+    echo ""
+    echo "Arguments (if none, uses [help]):"
+    echo "- [help] <file>           Displays the list of handled arguments if a bash script."
+    echo "- [autocomplete] <file>   Adds autocompletion to the bash script (assuming it uses the file's basename)."
+
+## Adds autocompletion to the script $2. $3 is used to define a custom alias (optional).
+elif [[ "$1" == "autocomplete" ]]; then
+
+    add_autocomplete $2 $3
+
+## Shows the help of the script $2
+elif [[ "$1" == "help" ]]; then
+
+    show_help $2
+
+## If only given a path, tries to display the script help for it.
+else
+    show_help $1
+fi

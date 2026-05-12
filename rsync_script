@@ -1,0 +1,40 @@
+#!/bin/sh
+
+script_path=$(realpath "$0")
+script_dir=${0%/*}
+script_name=$(basename "$script_path")
+
+# $1: target destination
+# $2: folder to synchronize
+rsync-folder() {
+	sudo rsync -avu \
+		--exclude='node_modules' \
+		--exclude='__pycache__' \
+		--exclude='build' \
+		--exclude='*.tmp' \
+		--exclude='*Temp*' \
+		--exclude='*Artifacts*' \
+		--exclude='*Cache*' \
+		--exclude='*output*' \
+		"$2" "$1/$2"
+}
+
+## Synchronizes all main folders.
+if [[ $1 == 'all' ]]; then
+	rsync-folder $2 Books
+	rsync-folder $2 Documents
+	rsync-folder $2 Music
+	rsync-folder $2 Pictures
+	rsync-folder $2 Programs
+	rsync-folder $2 Projects
+
+## Synchronize the target folder ($1) with the one in the destination ($2).
+elif [[ ! -z $1 && ! -z $2 ]]; then
+	rsync-folder $2 $1
+
+## Shows this help
+else
+	echo "\$1: [all|<target>]"
+	echo "\$2: destination folder"
+    ~/.scripts/script_help $0
+fi

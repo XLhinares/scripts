@@ -1,0 +1,48 @@
+#!/bin/bash
+
+start () {
+    # Allow port in firewall
+    sudo ufw allow 8211/udp
+    $HOME/Projects/Rust/playit-agent/target/release/playit-cli
+}
+
+stop () {
+    pkill playit-cli
+    sudo ufw delete allow 8211/udp
+}
+
+set_ip () {
+    SERVER_IP=$1
+    SERVER_PORT=$2
+    # Edit PalWorldSettings.ini
+    INI_FILE="/mnt/games/SteamLibrary/steamapps/common/PalServer/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"
+    if [ -f "$INI_FILE" ]; then
+        sed -i "s/PublicIP=.*/PublicIP=$SERVER_IP/" "$INI_FILE"
+        sed -i "s/PublicPort=.*/PublicPort=$SERVER_PORT/" "$INI_FILE"
+        echo "Updated ini with IP=$SERVER_IP, Port=$SERVER_PORT"
+    else
+        echo "Error: $INI_FILE not found."
+        exit 1
+    fi
+
+    echo "Game can be joined at: $SERVER_IP:$SERVER_PORT"
+}
+
+
+## Start port forwarding.
+if [[ "$1" == "start" ]]; then
+    start
+
+## Stops port forwarding.
+elif [[ "$1" == "stop" ]]; then
+    stop
+
+## <ip> <port>      Sets the palserver ini values.
+elif [[ "$1" == "setip" ]]; then
+    set_ip $2 $3
+
+else
+  echo "Utility to do the network config needed to start a Palworld server."
+  echo ""
+  $HOME/.scripts/script_help help $0
+fi
