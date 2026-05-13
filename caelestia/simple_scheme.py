@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 
+from materialyoucolor import scheme as m3
+
 ## PATHS ======================================================================
 PATH_SCHEME_DATA = sys.argv[0].replace(".py", "_data.json")
 if not os.path.exists(PATH_SCHEME_DATA):
@@ -24,20 +26,26 @@ class Color(object):
         self._color = (self.r, self.g, self.b)
 
     @classmethod
-    def parseHex(cls, string: str):
+    def parseHex(cls, string: str) -> "Color":
         string = string.lstrip("#")
         return Color(int(string, 16))
 
-    def get_tuple(self):
+    def get_tuple(self) -> tuple:
         return self._color
 
-    def get_hex_str(self):
+    def get_hex(self) -> int:
+        return (self.r << 16) | (self.g << 8) | self.b
+
+    def get_argb(self) -> int:
+        return (0xFF << 24) | (self.r << 16) | (self.g << 8) | self.b
+
+    def get_hex_str(self) -> str:
         return "#%02X%02X%02X" % self._color
 
-    def hex_as_str(self):
+    def hex_as_str(self) -> str:
         return "%02X%02X%02X" % self._color
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.get_hex_str()
 
     def get_luminance(self) -> float:
@@ -46,27 +54,7 @@ class Color(object):
     def is_dark(self) -> bool:
         return self.get_luminance() < 128
 
-    def get_tonal_palette(self):
-        """Generate a 100-step tonal palette (0=white, 50=base, 100=black)."""
-        palette = []
-        R, G, B = self.r / 255.0, self.g / 255.0, self.b / 255.0
-        H, L, S = colorsys.rgb_to_hls(R, G, B)
-
-        for tone in range(100):
-            # Linearly interpolate lightness (0=white, 100=black)
-            if tone <= 50:
-                new_l = L + (1.0 - L) * (50 - tone) / 50
-            else:
-                new_l = L - L * (tone - 50) / 50
-            new_l = max(0.0, min(1.0, new_l))
-            r_new, g_new, b_new = colorsys.hls_to_rgb(H, new_l, S)
-            color_int = (
-                (int(r_new * 255) << 16) | (int(g_new * 255) << 8) | int(b_new * 255)
-            )
-            palette.append(Color(color_int))
-        return palette
-
-    def with_lightness(self, lightness: int = 50):
+    def with_lightness(self, lightness: int = 50) -> "Color":
         """Returns this color with the lightness adjusted to the given value.
         This allows use to not generate a tonal palette each time we want a color.
         0=white, 50=base, 100=black
@@ -83,11 +71,11 @@ class Color(object):
         )
         return Color(color_int)
 
-    def get_on_top_color(self):
+    def get_on_top_color(self) -> "Color":
         """Return white (for dark colors) or black (for light colors)."""
         return Color(0xFFFFFF) if self.is_dark() else Color(0x000000)
 
-    def get_container_color(self, is_dark_mode=False, level=0):
+    def get_container_color(self, is_dark_mode=False, level=0) -> "Color":
         """Return the color for a container on top of the current color.
         The level allows to stack containers on top of each other.
         """
@@ -95,7 +83,7 @@ class Color(object):
         lightness += level * -3
         return self.with_lightness(lightness)
 
-    def get_on_container_color(self, is_dark_mode=False):
+    def get_on_container_color(self, is_dark_mode=False) -> "Color":
         """Return the text color for the container (inverse of container)."""
         container = self.get_container_color(is_dark_mode)
         return container.get_on_top_color()
@@ -109,9 +97,18 @@ def generate_scheme(
     tertiary: Color,
     error: Color = Color(0xFFB4AB),
     success: Color = Color(0xB5CCBA),
-):
-    test = Color(0xFF0000)
+) -> dict:
+    """Returns a dictionary matching m3 color scheme format,
+    with colors changed to fit the provided colors.
+    """
+
     dark_mode: bool = surface.is_dark()
+    print(f"surface argb: {surface.get_argb()}")
+    surface_scheme = (
+        m3.Scheme.dark(surface.get_argb())
+        if surface.is_dark()
+        else m3.Scheme.light(surface.get_argb())
+    )
     new_scheme = {
         "name": "dynamic",
         "flavour": "default",
@@ -295,24 +292,54 @@ def generate_scheme(
         },
     }
 
+    return new_scheme
+
+
+def save_scheme_base(name: str, base: list):
+    """Saves the given scheme base to the data file.
+
+    Use example:
+        save_scheme_base("my_scheme", ["#010101", "#DD8810", "#697580", "#DE881D"])
+    """
+    with open(PATH_SCHEME_DATA, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Add the new scheme
+    data[name] = {
+        "surface": base[0].lstrip("#"),
+        "primary": base[1].lstrip("#"),
+        "secondary": base[2].lstrip("#"),
+        "tertiary": base[3].lstrip("#"),
+    }
+
+    # Save the updated data
+    with open(PATH_SCHEME_DATA, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def export_scheme(scheme: dict):
+    """Replace the Caelestia scheme with the given scheme."""
     # Write as proper JSON (not Python dict string)
     with open(PATH_CAELESTIA_SCHEME, "w") as f:
-        json.dump(new_scheme, f, indent=2)
+        json.dump(scheme, f, indent=2)
+        # json.dump(new_scheme, f, indent=2)
 
 
-def generate_scheme_from_name(scheme: str):
+def use_scheme_from_name(scheme: str):
+    """Look up the scheme by its name and tells Caelestia to use it."""
     try:
         with open(PATH_SCHEME_DATA, mode="r", encoding="utf-8") as read_file:
             data = json.load(read_file)
 
             if scheme in data:
                 scheme_data = data[scheme]
-                generate_scheme(
+                full_scheme = generate_scheme(
                     surface=Color.parseHex(scheme_data["surface"]),
                     primary=Color.parseHex(scheme_data["primary"]),
                     secondary=Color.parseHex(scheme_data["secondary"]),
                     tertiary=Color.parseHex(scheme_data["tertiary"]),
                 )
+                export_scheme(full_scheme)
             else:
                 print(f"Error: Scheme '{scheme}' not found in the JSON file.")
 
@@ -322,7 +349,8 @@ def generate_scheme_from_name(scheme: str):
         print("Error: Failed to decode JSON from the file.")
 
 
-def set_from(path: str):
+def generate_from_path(path: str):
+    """Run the color-picker on the image at <path> and generate a scheme from it."""
     # Run the color picker and capture its output
     result = subprocess.run(
         ["python", PATH_SCHEME_PICKER, path],
@@ -332,27 +360,17 @@ def set_from(path: str):
         stderr=subprocess.PIPE,
     )
 
-    # Parse the JSON output
     try:
-        colors = json.loads(result.stdout.strip())
-        print("Selected colors:", colors)
-        # Load existing data
-        with open(PATH_SCHEME_DATA, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Add the new scheme
-        data[path] = {
-            "surface": colors[0].lstrip("#"),
-            "primary": colors[1].lstrip("#"),
-            "secondary": colors[2].lstrip("#"),
-            "tertiary": colors[3].lstrip("#"),
-        }
-
-        # Save the updated data
-        with open(PATH_SCHEME_DATA, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-
-        generate_scheme_from_name(path)
+        colors_dict = json.loads(result.stdout.strip())
+        colors_list = [
+            colors_dict["surface"],
+            colors_dict["primary"],
+            colors_dict["secondary"],
+            colors_dict["tertiary"],
+        ]
+        print("Selected colors:", colors_list)
+        save_scheme_base(path, colors_list)
+        use_scheme_from_name(path)
 
     except json.JSONDecodeError:
         print("Error: Failed to parse colors from the color picker.")
@@ -372,40 +390,62 @@ def get_current_wallpaper():
 ## MAIN =======================================================================
 if __name__ == "__main__":
     ## GENERATE FROM <PATH>
-    if len(sys.argv) >= 3 and sys.argv[1] == "generate-from":
-        generate_scheme_from_name(sys.argv[2])
-
-    ## SET FROM <PATH>
-    elif len(sys.argv) >= 3 and sys.argv[1] == "set-from":
-        wp_path = sys.argv[2]
-        set_from(wp_path)
+    if len(sys.argv) >= 3 and sys.argv[1] == "use-from":
+        use_scheme_from_name(sys.argv[2])
 
     ## GENERATE FROM WALLPAPER
-    elif len(sys.argv) >= 2 and sys.argv[1] == "generate-from-wp":
+    elif len(sys.argv) >= 2 and sys.argv[1] == "use-from-wp":
         wp_path = get_current_wallpaper()
-        generate_scheme_from_name(wp_path)
+        use_scheme_from_name(wp_path)
+
+    ## GENERATE FROM <PATH>
+    elif len(sys.argv) >= 7 and sys.argv[1] == "generate-from-values":
+        try:
+            name = sys.argv[2]
+            scheme = generate_scheme(
+                surface=Color.parseHex(sys.argv[3]),
+                primary=Color.parseHex(sys.argv[4]),
+                secondary=Color.parseHex(sys.argv[5]),
+                tertiary=Color.parseHex(sys.argv[6]),
+            )
+            print(scheme)
+            # Generate the theme first so exception cause the script to fail before saving the scheme.
+            save_scheme_base(name, sys.argv[3:7])
+            export_scheme(scheme)
+        except Exception as e:
+            print("Incorrect use of [generate-from-values]")
+            print(
+                f"Usage: {sys.argv[0]} generate-from-values <name> <#surface> <#primary> <#secondary> <#tertiary>"
+            )
+            print(
+                f'Example: {sys.argv[0]} generate-from-values "my_scheme" "#010101" "#DD8810" "#697580" "#DE881D"'
+            )
+            print(e)
+
+    ## SET FROM <PATH>
+    elif len(sys.argv) >= 3 and sys.argv[1] == "generate-from-path":
+        wp_path = sys.argv[2]
+        generate_from_path(wp_path)
 
     ## SET FROM WALLPAPER
-    elif len(sys.argv) >= 2 and sys.argv[1] == "set-from-wp":
+    elif len(sys.argv) >= 2 and sys.argv[1] == "generate-from-wp":
         wp_path = get_current_wallpaper()
-        set_from(wp_path)
+        generate_from_path(wp_path)
 
     else:
-        print("Caelestia color scheme generation utility.")
-        print(
-            "Basically, it pulls the base colors of a scheme from the [theme-generator-base.json] file. It can be used to define a custom scheme for a wallpaper and hooked to caelestia's client."
-        )
-        print("")
-        print("Usage: python theme-generator.py [arg]")
-        print("Arguments:")
-        print("  [generate-from] <name>     Generates the scheme from its name.")
-        print(
-            "  [generate-from-wp]         Generates the scheme from the caelestia WP."
-        )
-        print(
-            "  [set-from] <path>          Let the user create a scheme from the image at <path>."
-        )
-        print(
-            "  [set-from-wp]              Let the user create a scheme from the caelestia WP."
-        )
-        print("  [help]                     Show this message")
+        CE = "\x1b[33m"  # Color yellow
+        CR = "\x1b[0m"  # Color reset
+        help_message = f"""Caelestia color scheme generation utility.
+
+Basically, it pulls the base colors of a scheme from the [theme-generator-base.json] file. It can be used to define a custom scheme for a wallpaper and hooked to caelestia's client.
+
+Usage: {CE}python theme-generator.py [arg]{CR}
+Arguments:
+    {CE}[use-from] <n>{CR}              Generates the scheme from its name <n>.
+    {CE}[use-from-wp]{CR}               Generates the scheme from the caelestia WP.
+    {CE}[generate-from-image] <p>{CR}   Let the user create a scheme from the image at <path>.
+    {CE}[generate-from-wp]{CR}          Let the user create a scheme from the caelestia WP.
+    {CE}[generate-from-values] <v>{CR}  Let the user create a scheme from the 4 base values.
+    {CE}[help]{CR}                      Show this message"
+"""
+        print(help_message)

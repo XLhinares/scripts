@@ -6,29 +6,33 @@ from PIL import Image, ImageOps, ImageTk
 
 
 class ColorPicker:
-    def __init__(self, image_path):
-        self.image_path = image_path
-        self.selected_colors = []
-        self.color_boxes = []  # Store references to color boxes
+    def __init__(
+        self,
+        image_path: str,
+        color_names: list[str] = [
+            "surface",
+            "primary",
+            "secondary",
+            "tertiary",
+        ],
+    ):
+        self.image_path: str = image_path
+        self.color_names: list[str] = color_names
+        self.color_values: list[str] = ["#000000" for i in color_names]
+        self.current_index: int = 0
+        self.current_color = "#000000"
 
-        # Initialize Tkinter root
+        # WINDOW --------------------------------------------------------------
         self.root = tk.Tk()
         self.root.title("Click 4 colors")
+        self.root.wm_attributes("-type", "dialog")  ## Window float
 
-        # Make the window float on Hyprland
-        self.root.wm_attributes("-type", "dialog")
-
-        # Get screen dimensions
+        # Make the window pseudo-fullscreen (cover the entire screen)
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
-
-        # Make the window fullscreen (cover the entire screen)
         self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
-        # self.root.attributes("-fullscreen", True)  # Optional: true fullscreen
 
-        # Load image
-        self.original_image = Image.open(image_path)
-        # Load and scale image to cover the screen
+        # IMAGE ---------------------------------------------------------------
         self.original_image = Image.open(image_path)
         self.scaled_image = ImageOps.fit(
             self.original_image,
@@ -48,71 +52,24 @@ class ColorPicker:
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
         self.canvas.pack()
 
-        # Bind mouse events to the canvas
-        self.canvas.bind("<Button-1>", self.on_click)
-        self.canvas.bind("<Motion>", self.on_motion)
-
-        # Color preview panel (overlaid on the canvas)
-        self.preview_frame_bg = "#1b1b1b"
-        self.preview_text_color = "#ffffff"
-        self.preview_frame = tk.Frame(
+        # PANEL ---------------------------------------------------------------
+        self.preview_panel = ColorPreviewPanel(
             self.root,
-            bd=1,
-            relief=tk.FLAT,
-            borderwidth=2,
-            bg=self.preview_frame_bg,
-            padx=8,
-            pady=8,
+            color_names=self.color_names,
+            select_editing_color_callback=self.select_index,
+            validate_callback=self.validate,
+            cancel_callback=self.cancel,
         )
-        self.preview_frame.place(
-            x=96,  # 16px from left
-            y=32,  # 16px from top
-            anchor=tk.NW,
-        )
+        self.preview_panel.frame.place(x=96, y=48, anchor=tk.NW)
 
-        row_frame = tk.Frame(
-            self.preview_frame,
-            background=self.preview_frame_bg,
-        )
-        row_frame.pack(fill=tk.X, padx=16, pady=8)
-        label = tk.Label(
-            row_frame,
-            text="Click to pick colors",
-            anchor=tk.W,
-            foreground=self.preview_text_color,
-            background=self.preview_frame_bg,
-        )
-        label.pack(side=tk.LEFT)
-
-        # Add 4 rows for Background, Primary, Secondary, Tertiary
-        color_names = ["Background", "Primary", "Secondary", "Tertiary"]
-        for name in color_names:
-            row_frame = tk.Frame(
-                self.preview_frame,
-                background=self.preview_frame_bg,
-            )
-            row_frame.pack(fill=tk.X, padx=16, pady=4)  # Padding inside the panel
-
-            label = tk.Label(
-                row_frame,
-                text=f"{name}:",
-                width=10,
-                anchor=tk.W,
-                foreground=self.preview_text_color,
-                background=self.preview_frame_bg,
-            )
-            label.pack(side=tk.LEFT)
-
-            color_box = tk.Frame(
-                row_frame,
-                width=30,
-                height=20,
-                bg=self.preview_text_color,
-                bd=1,
-                relief=tk.SOLID,
-            )
-            color_box.pack(side=tk.LEFT, padx=8)
-            self.color_boxes.append(color_box)
+        # INTERACTIONS --------------------------------------------------------
+        self.canvas.focus_set()
+        self.canvas.bind("<Down>", self.on_down)
+        self.canvas.bind("<Up>", self.on_up)
+        self.canvas.bind("<Return>", self.on_enter)  # "Enter" key
+        self.canvas.bind("<Button-1>", self.on_click)
+        self.canvas.bind("<Button-3>", self.on_up)
+        self.canvas.bind("<Motion>", self.on_motion)
 
         self.root.mainloop()
 
@@ -133,29 +90,276 @@ class ColorPicker:
 
     def on_motion(self, event):
         """Update the live preview when the mouse moves."""
-        hex_color = self.get_pixel_color(event.x, event.y)
-        # Update the live preview (next empty color box)
-        if len(self.selected_colors) < 4:
-            self.color_boxes[len(self.selected_colors)].config(bg=hex_color)
+        self.preview_panel.zoom_panel.update(self.scaled_image, event.x, event.y)
+        if self.current_index < len(self.color_names):
+            self.current_color = self.get_pixel_color(event.x, event.y)
+            self.preview_panel.color_boxes[self.current_index].config(
+                bg=self.current_color
+            )
 
-    def on_click(self, event):
-        if len(self.selected_colors) >= 4:
-            self.root.destroy()
-            return
+    def on_down(self, event) -> None:
+        self.select_index(self.current_index + 1)
 
-        hex_color = self.get_pixel_color(event.x, event.y)
-        self.selected_colors.append(hex_color)
-        # print(f"Selected color {len(self.selected_colors)}: {hex_color}")
+    def on_up(self, event) -> None:
+        self.select_index(self.current_index - 1)
 
-        # Lock the color in the box
-        if len(self.selected_colors) <= 4:
-            self.color_boxes[len(self.selected_colors) - 1].config(bg=hex_color)
+    def select_index(self, index) -> None:
+        """Select an index and propagate the information.
+        The index value is clamped between 0 and `len(self.color_names) + 2`, to allow selecting the "cancel" and "validate" button.
+        """
+        if self.current_index < len(self.color_names):
+            self.preview_panel.color_boxes[self.current_index].config(
+                bg=self.color_values[self.current_index]
+            )
+        self.current_index = index % (
+            len(self.color_names) + 2
+        )  # Add two for the cancel and validate buttons.
+        self.preview_panel.select_index(self.current_index)
 
-        if len(self.selected_colors) == 4:
-            self.root.destroy()
-            print(json.dumps(self.selected_colors))
-            # print("\nFinal colors:", self.selected_colors)
-            sys.exit(0)
+    def on_click(self, event) -> None:
+        """Update the value of the editing color to match the hovered pixel."""
+        self.color_values[self.current_index] = self.current_color
+        # If the last color is clicked, jump to "validate button",
+        # otherwise, just go to next item down.
+        if self.current_index == len(self.color_names) - 1:
+            self.on_down(None)
+            self.on_down(None)
+        else:
+            self.on_down(None)
+
+    def on_enter(self, event) -> None:
+        if self.current_index == len(self.color_names):
+            self.cancel()
+        elif self.current_index == len(self.color_names) + 1:
+            self.validate()
+        else:
+            self.on_click(None)
+
+    def validate(self) -> None:
+        color_dict = {}
+        for i in range(len(self.color_names)):
+            color_dict[self.color_names[i]] = self.color_values[i]
+        print(json.dumps(color_dict))
+        self.root.destroy()
+        sys.exit(0)
+
+    def cancel(self) -> None:
+        self.root.destroy()
+        sys.exit(1)
+
+
+class ZoomPreviewPanel:
+    def __init__(
+        self,
+        parent,
+        item_size: float = 100,
+    ):
+        self.parent = parent
+        self.item_size = item_size
+        self.frame = tk.Frame(
+            parent,
+            bg="black",
+            borderwidth=2,
+            width=self.item_size,
+            height=self.item_size,
+        )
+        self.canvas = tk.Canvas(
+            self.frame,
+            name="base",
+            width=self.item_size,
+            height=self.item_size,
+            highlightthickness=0,
+            bg="black",
+        )
+        self._add_crosshair(self.canvas)
+        self.canvas.pack()
+
+    def _add_crosshair(self, canvas):
+        canvas.create_line(
+            self.item_size / 2,
+            self.item_size / 2 - 5,
+            self.item_size / 2,
+            self.item_size / 2 + 5,
+            fill="white",
+            width=1,
+        )
+        canvas.create_line(
+            self.item_size / 2 - 5,
+            self.item_size / 2,
+            self.item_size / 2 + 5,
+            self.item_size / 2,
+            fill="white",
+            width=1,
+        )
+
+    def update(self, image, x, y):
+        self.canvas.delete("base")
+        half_size = 10
+        x1 = max(0, x - half_size)
+        y1 = max(0, y - half_size)
+        x2 = min(image.width, x + half_size)
+        y2 = min(image.height, y + half_size)
+
+        cropped = image.crop((x1, y1, x2, y2))
+        resized = cropped.resize(
+            (self.item_size, self.item_size),
+            Image.Resampling.NEAREST,
+        )
+        zoom_photo = ImageTk.PhotoImage(resized)
+
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=zoom_photo)
+        self._add_crosshair(self.canvas)
+        self.zoom_photo = zoom_photo  # Keep reference
+
+
+class ColorPreviewPanel:
+    def __init__(
+        self,
+        parent,
+        color_names,
+        select_editing_color_callback,
+        validate_callback,
+        cancel_callback,
+        bg="#1b1b1b",
+        text_color="#ffffff",
+    ):
+        self.parent = parent
+        self.color_names = color_names
+        self.select_editing_color_callback = select_editing_color_callback
+        self.validate_callback = validate_callback
+        self.cancel_callback = cancel_callback
+        self.bg = bg
+        self.fg = text_color
+        self.selectors = []
+        self.color_boxes = []
+        self.color_editing_index = 0
+
+        self.frame = tk.Frame(
+            parent,
+            bd=1,
+            relief=tk.FLAT,
+            borderwidth=2,
+            border=0xFFFFFF,
+            bg=self.bg,
+            padx=8,
+            pady=8,
+        )
+
+        self._add_title()
+        self._add_zoom_panel()
+        self._add_separator()
+        self._add_color_rows()
+        self._add_separator()
+        self._add_buttons()
+
+    def _add_separator(self):
+        separator = tk.Frame(self.frame, height=1, bg="#444444")
+        separator.pack(fill=tk.X, padx=16, pady=8)
+
+    def _add_title(self):
+        row_frame = tk.Frame(self.frame, background=self.bg)
+        row_frame.pack(fill=tk.BOTH, padx=16, pady=8)
+        label = tk.Label(
+            row_frame,
+            text="COLOR PICKER",
+            anchor=tk.CENTER,
+            foreground=self.fg,
+            background=self.bg,
+        )
+        label.pack(side=tk.TOP)
+
+    def _add_zoom_panel(self):
+        self.zoom_panel = ZoomPreviewPanel(self.frame)
+        self.zoom_panel.frame.pack(fill=tk.X, padx=16, pady=8)
+
+    def _add_color_rows(self):
+
+        for index in range(len(self.color_names)):
+            row_frame = tk.Frame(self.frame, background=self.bg)
+            row_frame.pack(fill=tk.X, padx=16, pady=4)
+            selector = tk.Button(
+                row_frame,
+                text=">" if index == self.color_editing_index else "-",
+                command=lambda i=index: self.select_editing_color_callback(i),
+                anchor=tk.CENTER,
+                borderwidth=0,
+                width=2,
+                padx=4,
+                pady=4,
+                bg=self.bg,
+                fg=self.fg,
+            )
+            selector.pack(side=tk.LEFT)
+
+            label = tk.Label(
+                row_frame,
+                text=f"{self.color_names[index]}:",
+                padx=5,
+                width=10,
+                anchor=tk.W,
+                foreground=self.fg,
+                background=self.bg,
+            )
+            label.pack(side=tk.LEFT)
+
+            color_box = tk.Frame(
+                row_frame,
+                width=30,
+                height=20,
+                bg="#000000",
+                bd=1,
+                relief=tk.SOLID,
+            )
+            color_box.pack(side=tk.LEFT, padx=8)
+
+            self.selectors.append(selector)
+            self.color_boxes.append(color_box)
+
+    def _add_buttons(self):
+        button_frame = tk.Frame(self.frame, background=self.bg)
+        button_frame.pack(fill=tk.X, padx=16, pady=8)
+
+        self.validate_button = tk.Button(
+            button_frame,
+            text="Validate",
+            command=self.validate_callback,
+            bg=self.bg,
+            fg=self.fg,
+        )
+        self.validate_button.pack(side=tk.RIGHT, padx=4)
+
+        self.cancel_button = tk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.cancel_callback,
+            bg=self.bg,
+            fg=self.fg,
+        )
+        self.cancel_button.pack(side=tk.RIGHT, padx=4)
+
+    def select_index(self, index: int) -> None:
+        for i in range(len(self.color_names)):
+            self.selectors[i].config(text=">" if i == index else "-")
+        if index == len(self.color_names):
+            self.cancel_button.config(
+                bg=self.fg,
+                fg=self.bg,
+            )
+        else:
+            self.cancel_button.config(
+                bg=self.bg,
+                fg=self.fg,
+            )
+        if index == len(self.color_names) + 1:
+            self.validate_button.config(
+                bg=self.fg,
+                fg=self.bg,
+            )
+        else:
+            self.validate_button.config(
+                bg=self.bg,
+                fg=self.fg,
+            )
 
 
 if __name__ == "__main__":
