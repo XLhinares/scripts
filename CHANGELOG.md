@@ -1,3 +1,8 @@
+## 1.0.3
+
+    - caelestia scheme: much improved color picker
+- readme: added distro disclaimer
+
 ## 1.0.2
 
     - readme: minor changes
