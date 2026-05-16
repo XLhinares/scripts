@@ -44,5 +44,5 @@ elif [[ "$1" == "setip" ]]; then
 else
   echo "Utility to do the network config needed to start a Palworld server."
   echo ""
-  $HOME/.scripts/script_help help $0
+  $HOME/.scripts/tools/script_help help $0
 fi
