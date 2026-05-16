@@ -9,19 +9,25 @@ class ColorPicker:
     def __init__(
         self,
         image_path: str,
-        color_names: list[str] = [
-            "surface",
-            "primary",
-            "secondary",
-            "tertiary",
-        ],
+        default_colors: dict[str, str] = {
+            "surface": "#000000",
+            "primary": "#000000",
+            "secondary": "#000000",
+            "tertiary": "#000000",
+        },
     ):
         self.image_path: str = image_path
-        self.color_names: list[str] = color_names
-        self.color_values: list[str] = ["#000000" for i in color_names]
+        self.colors: dict[str, str] = default_colors
         self.current_index: int = 0
-        self.current_color = "#000000"
+        self.hovered_color: str = self.colors[self.get_current_name()]
 
+    def get_current_name(self) -> str:
+        return list(self.colors.keys())[self.current_index]
+
+    def get_current_color(self) -> str:
+        return self.colors[self.get_current_name()]
+
+    def get_colors(self):
         # WINDOW --------------------------------------------------------------
         self.root = tk.Tk()
         self.root.title("Click 4 colors")
@@ -33,7 +39,7 @@ class ColorPicker:
         self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
 
         # IMAGE ---------------------------------------------------------------
-        self.original_image = Image.open(image_path)
+        self.original_image = Image.open(self.image_path)
         self.scaled_image = ImageOps.fit(
             self.original_image,
             (self.screen_width, self.screen_height),
@@ -53,9 +59,12 @@ class ColorPicker:
         self.canvas.pack()
 
         # PANEL ---------------------------------------------------------------
+        print(f"values: {self.colors}")
+        print(f"values: {list(self.colors.values())}")
         self.preview_panel = ColorPreviewPanel(
             self.root,
-            color_names=self.color_names,
+            color_names=list(self.colors.keys()),
+            default_colors=list(self.colors.values()),
             select_editing_color_callback=self.select_index,
             validate_callback=self.validate,
             cancel_callback=self.cancel,
@@ -72,6 +81,9 @@ class ColorPicker:
         self.canvas.bind("<Motion>", self.on_motion)
 
         self.root.mainloop()
+
+        # RESULT --------------------------------------------------------------
+        return json.dumps(self.colors)
 
     def get_pixel_color(self, x, y):
         """Get the pixel color at the given coordinates."""
@@ -91,10 +103,10 @@ class ColorPicker:
     def on_motion(self, event):
         """Update the live preview when the mouse moves."""
         self.preview_panel.zoom_panel.update(self.scaled_image, event.x, event.y)
-        if self.current_index < len(self.color_names):
-            self.current_color = self.get_pixel_color(event.x, event.y)
+        if self.current_index < len(self.colors):
+            self.hovered_color = self.get_pixel_color(event.x, event.y)
             self.preview_panel.color_boxes[self.current_index].config(
-                bg=self.current_color
+                bg=self.hovered_color
             )
 
     def on_down(self, event) -> None:
@@ -105,47 +117,42 @@ class ColorPicker:
 
     def select_index(self, index) -> None:
         """Select an index and propagate the information.
-        The index value is clamped between 0 and `len(self.color_names) + 2`, to allow selecting the "cancel" and "validate" button.
+        The index value is clamped between 0 and `len(self.colors) + 2`, to allow selecting the "cancel" and "validate" button.
         """
-        if self.current_index < len(self.color_names):
+        if self.current_index < len(self.colors):
             self.preview_panel.color_boxes[self.current_index].config(
-                bg=self.color_values[self.current_index]
+                bg=self.get_current_color()
             )
         self.current_index = index % (
-            len(self.color_names) + 2
+            len(self.colors) + 2
         )  # Add two for the cancel and validate buttons.
         self.preview_panel.select_index(self.current_index)
 
     def on_click(self, event) -> None:
         """Update the value of the editing color to match the hovered pixel."""
-        self.color_values[self.current_index] = self.current_color
+        self.colors[self.get_current_name()] = self.hovered_color
         # If the last color is clicked, jump to "validate button",
         # otherwise, just go to next item down.
-        if self.current_index == len(self.color_names) - 1:
+        if self.current_index == len(self.colors) - 1:
             self.on_down(None)
             self.on_down(None)
         else:
             self.on_down(None)
 
     def on_enter(self, event) -> None:
-        if self.current_index == len(self.color_names):
+        if self.current_index == len(self.colors):
             self.cancel()
-        elif self.current_index == len(self.color_names) + 1:
+        elif self.current_index == len(self.colors) + 1:
             self.validate()
         else:
             self.on_click(None)
 
     def validate(self) -> None:
-        color_dict = {}
-        for i in range(len(self.color_names)):
-            color_dict[self.color_names[i]] = self.color_values[i]
-        print(json.dumps(color_dict))
         self.root.destroy()
-        sys.exit(0)
 
     def cancel(self) -> None:
         self.root.destroy()
-        sys.exit(1)
+        exit(1)
 
 
 class ZoomPreviewPanel:
@@ -216,15 +223,17 @@ class ColorPreviewPanel:
     def __init__(
         self,
         parent,
-        color_names,
+        color_names: list[str],
+        default_colors: list[str],
         select_editing_color_callback,
         validate_callback,
         cancel_callback,
-        bg="#1b1b1b",
-        text_color="#ffffff",
+        bg: str = "#1b1b1b",
+        text_color: str = "#ffffff",
     ):
         self.parent = parent
         self.color_names = color_names
+        self.default_colors = default_colors
         self.select_editing_color_callback = select_editing_color_callback
         self.validate_callback = validate_callback
         self.cancel_callback = cancel_callback
@@ -306,7 +315,7 @@ class ColorPreviewPanel:
                 row_frame,
                 width=30,
                 height=20,
-                bg="#000000",
+                bg=self.default_colors[index],
                 bd=1,
                 relief=tk.SOLID,
             )
@@ -366,4 +375,5 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python color_picker.py <image_path>")
         sys.exit(1)
-    ColorPicker(sys.argv[1])
+    color_picker = ColorPicker(sys.argv[1])
+    print(color_picker.get_colors())

@@ -1,18 +1,6 @@
 import colorsys
-import json
-import os
-import subprocess
-import sys
 
 from materialyoucolor import scheme as m3
-
-## PATHS ======================================================================
-PATH_SCHEME_DATA = sys.argv[0].replace(".py", "_data.json")
-if not os.path.exists(PATH_SCHEME_DATA):
-    os.mknod(PATH_SCHEME_DATA)
-    print(f"Created file: '{PATH_SCHEME_DATA}'")
-PATH_CAELESTIA_SCHEME = os.path.expanduser("~/.local/state/caelestia/scheme.json")
-PATH_SCHEME_PICKER = os.path.expanduser("~/.scripts/caelestia/image_scheme_picker.py")
 
 
 ## CLASSES ====================================================================
@@ -103,12 +91,11 @@ def generate_scheme(
     """
 
     dark_mode: bool = surface.is_dark()
-    print(f"surface argb: {surface.get_argb()}")
-    surface_scheme = (
-        m3.Scheme.dark(surface.get_argb())
-        if surface.is_dark()
-        else m3.Scheme.light(surface.get_argb())
-    )
+    # surface_scheme = (
+    #     m3.Scheme.dark(surface.get_argb())
+    #     if surface.is_dark()
+    #     else m3.Scheme.light(surface.get_argb())
+    # )
     new_scheme = {
         "name": "dynamic",
         "flavour": "default",
@@ -295,157 +282,21 @@ def generate_scheme(
     return new_scheme
 
 
-def save_scheme_base(name: str, base: list):
-    """Saves the given scheme base to the data file.
-
-    Use example:
-        save_scheme_base("my_scheme", ["#010101", "#DD8810", "#697580", "#DE881D"])
+def generate_scheme_from_hex(
+    surface: str,
+    primary: str,
+    secondary: str,
+    tertiary: str,
+    error: str = "FFB4AB",
+    success: str = "B5CCBA",
+) -> dict:
+    """Returns a dictionary matching m3 color scheme format,
+    with colors changed to fit the provided colors.
     """
-    with open(PATH_SCHEME_DATA, "r", encoding="utf-8") as f:
-        data = json.load(f)
 
-    # Add the new scheme
-    data[name] = {
-        "surface": base[0].lstrip("#"),
-        "primary": base[1].lstrip("#"),
-        "secondary": base[2].lstrip("#"),
-        "tertiary": base[3].lstrip("#"),
-    }
-
-    # Save the updated data
-    with open(PATH_SCHEME_DATA, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-
-def export_scheme(scheme: dict):
-    """Replace the Caelestia scheme with the given scheme."""
-    # Write as proper JSON (not Python dict string)
-    with open(PATH_CAELESTIA_SCHEME, "w") as f:
-        json.dump(scheme, f, indent=2)
-        # json.dump(new_scheme, f, indent=2)
-
-
-def use_scheme_from_name(scheme: str):
-    """Look up the scheme by its name and tells Caelestia to use it."""
-    try:
-        with open(PATH_SCHEME_DATA, mode="r", encoding="utf-8") as read_file:
-            data = json.load(read_file)
-
-            if scheme in data:
-                scheme_data = data[scheme]
-                full_scheme = generate_scheme(
-                    surface=Color.parseHex(scheme_data["surface"]),
-                    primary=Color.parseHex(scheme_data["primary"]),
-                    secondary=Color.parseHex(scheme_data["secondary"]),
-                    tertiary=Color.parseHex(scheme_data["tertiary"]),
-                )
-                export_scheme(full_scheme)
-            else:
-                print(f"Error: Scheme '{scheme}' not found in the JSON file.")
-
-    except FileNotFoundError:
-        print(f"Error: The file '{PATH_SCHEME_DATA}' was not found.")
-    except json.JSONDecodeError:
-        print("Error: Failed to decode JSON from the file.")
-
-
-def generate_from_path(path: str):
-    """Run the color-picker on the image at <path> and generate a scheme from it."""
-    # Run the color picker and capture its output
-    result = subprocess.run(
-        ["python", PATH_SCHEME_PICKER, path],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+    return generate_scheme(
+        surface=Color.parseHex(surface),
+        primary=Color.parseHex(primary),
+        secondary=Color.parseHex(secondary),
+        tertiary=Color.parseHex(tertiary),
     )
-
-    try:
-        colors_dict = json.loads(result.stdout.strip())
-        colors_list = [
-            colors_dict["surface"],
-            colors_dict["primary"],
-            colors_dict["secondary"],
-            colors_dict["tertiary"],
-        ]
-        print("Selected colors:", colors_list)
-        save_scheme_base(path, colors_list)
-        use_scheme_from_name(path)
-
-    except json.JSONDecodeError:
-        print("Error: Failed to parse colors from the color picker.")
-        print("Raw output:", result.stdout)
-
-
-def get_current_wallpaper():
-    return subprocess.run(
-        ["caelestia", "shell", "wallpaper", "get"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.strip("\n")
-
-
-## MAIN =======================================================================
-if __name__ == "__main__":
-    ## GENERATE FROM <PATH>
-    if len(sys.argv) >= 3 and sys.argv[1] == "use-from":
-        use_scheme_from_name(sys.argv[2])
-
-    ## GENERATE FROM WALLPAPER
-    elif len(sys.argv) >= 2 and sys.argv[1] == "use-from-wp":
-        wp_path = get_current_wallpaper()
-        use_scheme_from_name(wp_path)
-
-    ## GENERATE FROM <PATH>
-    elif len(sys.argv) >= 7 and sys.argv[1] == "generate-from-values":
-        try:
-            name = sys.argv[2]
-            scheme = generate_scheme(
-                surface=Color.parseHex(sys.argv[3]),
-                primary=Color.parseHex(sys.argv[4]),
-                secondary=Color.parseHex(sys.argv[5]),
-                tertiary=Color.parseHex(sys.argv[6]),
-            )
-            print(scheme)
-            # Generate the theme first so exception cause the script to fail before saving the scheme.
-            save_scheme_base(name, sys.argv[3:7])
-            export_scheme(scheme)
-        except Exception as e:
-            print("Incorrect use of [generate-from-values]")
-            print(
-                f"Usage: {sys.argv[0]} generate-from-values <name> <#surface> <#primary> <#secondary> <#tertiary>"
-            )
-            print(
-                f'Example: {sys.argv[0]} generate-from-values "my_scheme" "#010101" "#DD8810" "#697580" "#DE881D"'
-            )
-            print(e)
-
-    ## SET FROM <PATH>
-    elif len(sys.argv) >= 3 and sys.argv[1] == "generate-from-path":
-        wp_path = sys.argv[2]
-        generate_from_path(wp_path)
-
-    ## SET FROM WALLPAPER
-    elif len(sys.argv) >= 2 and sys.argv[1] == "generate-from-wp":
-        wp_path = get_current_wallpaper()
-        generate_from_path(wp_path)
-
-    else:
-        CE = "\x1b[33m"  # Color yellow
-        CR = "\x1b[0m"  # Color reset
-        help_message = f"""Caelestia color scheme generation utility.
-
-Basically, it pulls the base colors of a scheme from the [theme-generator-base.json] file. It can be used to define a custom scheme for a wallpaper and hooked to caelestia's client.
-
-Usage: {CE}python theme-generator.py [arg]{CR}
-Arguments:
-    {CE}[use-from] <n>{CR}              Generates the scheme from its name <n>.
-    {CE}[use-from-wp]{CR}               Generates the scheme from the caelestia WP.
-    {CE}[generate-from-image] <p>{CR}   Let the user create a scheme from the image at <path>.
-    {CE}[generate-from-wp]{CR}          Let the user create a scheme from the caelestia WP.
-    {CE}[generate-from-values] <v>{CR}  Let the user create a scheme from the 4 base values.
-    {CE}[help]{CR}                      Show this message"
-"""
-        print(help_message)

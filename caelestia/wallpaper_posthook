@@ -4,5 +4,5 @@
 # The various postHook scripts triggered on wallpaper change.
 
 /home/xavier/.scripts/caelestia/livepaper posthook
-python /home/xavier/.scripts/caelestia/simple_scheme.py use-from-wp
+python /home/xavier/.scripts/caelestia/simple_scheme_setter.py set-from-wp
 /home/xavier/.scripts/caelestia/scheme_tauon
