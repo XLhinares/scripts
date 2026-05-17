@@ -39,6 +39,7 @@ ERROR=$(jq -r '.colours.error' $CAELESTA_THEME_FILE)
 SURFACE=$(jq -r '.colours.surface' $CAELESTA_THEME_FILE)
 ON_SURFACE=$(jq -r '.colours.onSurface' $CAELESTA_THEME_FILE)
 CONTAINER=$(jq -r '.colours.surfaceContainer' $CAELESTA_THEME_FILE)
+CONTAINER_HIGH=$(jq -r '.colours.surfaceContainerHigh' $CAELESTA_THEME_FILE)
 ON_CONTAINER=$(jq -r '.colours.onSurfaceContainer' $CAELESTA_THEME_FILE)
 PRIMARY=$(jq -r '.colours.primary' $CAELESTA_THEME_FILE)
 ON_PRIMARY=$(jq -r '.colours.onPrimary' $CAELESTA_THEME_FILE)
@@ -58,6 +59,24 @@ THEME="# -----------------------------------------------------
 $SURFACE      player background
 $SURFACE      queue panel
 $SURFACE      gallery background
+
+# ---- TOP PANEL ----
+
+$CONTAINER      top panel
+$PRIMARY        tab active background
+$ON_PRIMARY     tab active text
+$CONTAINER_HIGH tab background
+$ON_CONTAINER   tab text
+$SECONDARY      tab over
+$ON_SECONDARY   tab over text
+
+$CONTAINER      music vis background
+$PRIMARY        music vis
+
+$SECONDARY      window buttons background
+$SURFACE        window buttons off
+$SURFACE        window buttons on
+$SECONDARY      window buttons icon over
 
 # ---- TRACK PANEL (MAIN) ----
 
@@ -86,52 +105,25 @@ $SECONDARY     gallery highlight
 
 $ON_SURFACE     column bar background
 
-# ---- MENU ----
-
-$ON_SURFACE      menu background
-$SECONDARY      menu highlight
-$SURFACE      menu border
-$SURFACE      menu text
-$ON_SURFACE      menu disable text
-$SURFACE      menu icons
-
-# ---- TOP PANEL ----
-
-$CONTAINER      top panel
-$SECONDARY      tab active background
-$ON_SECONDARY      tab active text
-$PRIMARY  tab background
-$ON_PRIMARY     tab text
-$SECONDARY   tab over
-$ON_SECONDARY      tab over text
-
-$SECONDARY      music vis background
-$SURFACE        music vis
-
-$SECONDARY      window buttons background
-$SURFACE        window buttons off
-$SURFACE        window buttons on
-$SECONDARY      window buttons icon over
-
 # ---- Bottom Panel ----
 
-$SECONDARY        bottom panel
-$ON_SECONDARY       buttons active
-$CONTAINER    buttons off
-$ON_SECONDARY       buttons over
+$CONTAINER        bottom panel
+$SECONDARY       buttons active
+$CONTAINER_HIGH    buttons off
+$SECONDARY       buttons over
 
-$ON_SECONDARY     playing time
-$ON_SECONDARY     seek bar
-$CONTAINER      seek bg
+$SECONDARY     playing time
+$SECONDARY     seek bar
+$CONTAINER_HIGH      seek bg
 
-$CONTAINER      volume bg
-$ON_SECONDARY     volume bar
+$CONTAINER_HIGH      volume bg
+$SECONDARY     volume bar
 
 $SECONDARY      scroll bar
 
-$CONTAINER        mode off
-$ON_SECONDARY     mode over
-$ON_SECONDARY     mode on
+$CONTAINER_HIGH        mode off
+$SECONDARY     mode over
+$SECONDARY     mode on
 
 $ON_SECONDARY          bottom title
 
@@ -140,7 +132,16 @@ $ON_SECONDARY          bottom title
 $SURFACE        side panel
 $ON_SURFACE     title info
 $ON_SURFACE     extra info
-$SECONDARY      art border
+$SURFACE      art border
+
+# ---- MENU ----
+
+$CONTAINER      menu background
+$SECONDARY      menu highlight
+$SURFACE      menu border
+$ON_CONTAINER      menu text
+$CONTAINER_HIGH      menu disable text
+$ON_CONTAINER      menu icons
 
 # ---- Mini Mode ----
 
