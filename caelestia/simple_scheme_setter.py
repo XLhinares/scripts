@@ -94,9 +94,9 @@ def create_scheme_from_image(image_path: str) -> None:
 
 def set_from_name(name: str) -> None:
     """(WIP) Need to wait for caelestia-cli to allow setting custom schemes"""
-    template_path = get_custom_scheme_path(name)
-    if os.path.exists(template_path):
-        with open(template_path, "r") as file_read:
+    custom_scheme_path = get_custom_scheme_path(name)
+    if os.path.exists(custom_scheme_path):
+        with open(custom_scheme_path, "r") as file_read:
             scheme = json.load(file_read)
             print(f"No caelestia-cli way to apply scheme {scheme}.")
             print("Use `force_set_from_name` for the moment")
@@ -124,6 +124,14 @@ def force_set_from_name(name: str) -> None:
     else:
         print(f"Could not load custom scheme `{name}`. Aborting.")
         exit(1)
+
+
+def remove_custom_scheme(name: str) -> None:
+    custom_scheme_path = get_custom_scheme_path(name)
+    if os.path.exists(custom_scheme_path):
+        os.remove(custom_scheme_path)
+    else:
+        print(f"No scheme {name} found. Doing nothing.")
 
 
 def get_current_wallpaper() -> str:
@@ -161,19 +169,27 @@ if __name__ == "__main__":
         wp_path = get_current_wallpaper()
         force_set_from_name(wp_path)
 
+    elif len(sys.argv) >= 3 and sys.argv[1] == "remove-from-name":
+        remove_custom_scheme(sys.argv[2])
+
+    elif len(sys.argv) >= 2 and sys.argv[1] == "remove-from-wp":
+        wp_path = get_current_wallpaper()
+        remove_custom_scheme(wp_path)
+        reload_wallpaper()  # Force Caelestia to reload scheme (only in manual scheme mode)
+
     else:
         CE = "\x1b[33m"  # Color yellow
         CR = "\x1b[0m"  # Color reset
         help_message = f"""Caelestia color scheme generation utility.
 
-Basically, it pulls the base colors of a scheme from the [theme-generator-base.json] file. It can be used to define a custom scheme for a wallpaper and hooked to caelestia's client.
-
-Usage: {CE}python theme-generator.py [arg]{CR}
+Usage: {CE}python simple_scheme_setter.py [arg]{CR}
 Arguments:
-    {CE}[set-from-name] <n>{CR}              Generates the scheme from its name <n>.
-    {CE}[set-from-wp]{CR}               Generates the scheme from the caelestia WP.
-    {CE}[create-from-path] <p>{CR}   Let the user create a scheme from the image at <path>.
-    {CE}[create-from-wp]{CR}          Let the user create a scheme from the caelestia WP.
-    {CE}[help]{CR}                      Show this message"
+    {CE}[set-from-name] <n>{CR}     Generates the scheme from its name <n>.
+    {CE}[set-from-wp]{CR}           Generates the scheme from the caelestia WP.
+    {CE}[create-from-path] <p>{CR}  Let the user create a scheme from the image at <path>.
+    {CE}[create-from-wp]{CR}        Let the user create a scheme from the caelestia WP.
+    {CE}[remove-from-name] <p>{CR}  Remove the custom scheme matching the <name>.
+    {CE}[remove-from-wp]{CR}        Remove the custom scheme matching the caelestia WP.
+    {CE}[help]{CR}                  Show this message"
 """
         print(help_message)
