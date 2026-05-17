@@ -3,7 +3,7 @@ import os
 import subprocess
 import sys
 
-from simple_scheme_generator import generate_scheme_from_hex
+from simple_scheme_generator import Scheme
 from simple_scheme_picker import ColorPicker
 
 ## PATHS ======================================================================
@@ -21,35 +21,34 @@ def get_custom_scheme_path(filepath: str) -> str:
     """Returns the path of the template matching a file.
     The file path is shortened to its basename to avoid over"""
     filename = os.path.basename(filepath)
-    return f"{PATH_CUSTOM_SCHEME_FOLDER}/{filename}.json"
+    return f"{PATH_CUSTOM_SCHEME_FOLDER}/{filename}.txt"
 
 
-def load_custom_scheme(name: str) -> dict:
+def load_custom_scheme(name: str) -> Scheme | None:
+    """ """
     try:
         scheme_path = get_custom_scheme_path(name)
-
-        if not os.path.isfile(scheme_path):
-            print(f"Error: The file '{get_custom_scheme_path(name)}' was not found.")
-            return {}
-
-        with open(scheme_path, mode="r", encoding="utf-8") as read_file:
-            data = json.load(read_file)
-            return data
+        return Scheme.from_caelestia_custom_scheme(
+            filepath=scheme_path,
+        )
     except FileNotFoundError:
         print(f"Error: The file '{get_custom_scheme_path(name)}' was not found.")
-        return {}
-    except json.JSONDecodeError:
-        print("Error: Failed to decode JSON from the file.")
-        return {}
+        return None
+    except Exception:
+        print(f"Something went wrong when accessing {get_custom_scheme_path(name)}")
+        return None
 
 
-def save_custom_scheme(name: str, scheme: dict) -> None:
+def save_custom_scheme(name: str, scheme: Scheme) -> None:
     """Replace the Caelestia scheme with the given scheme."""
     scheme_path = get_custom_scheme_path(name)
     if not os.path.exists(scheme_path):
         os.mknod(scheme_path)
-    with open(scheme_path, "w") as f:
-        json.dump(scheme, f, indent=2)
+    with open(scheme_path, "w") as file_write:
+        print(f"Saving custom scheme to {scheme_path}!")
+        file_write.writelines(
+            [f"{key} {value}\n" for (key, value) in scheme.colours.items()]
+        )
 
 
 def create_scheme_from_image(image_path: str) -> None:
@@ -64,12 +63,12 @@ def create_scheme_from_image(image_path: str) -> None:
             "secondary": "#000000",
             "tertiary": "#000000",
         }
-        if existing_scheme == {}
+        if not existing_scheme
         else {
-            "surface": f"#{existing_scheme['colours']['surface']}",
-            "primary": f"#{existing_scheme['colours']['primary']}",
-            "secondary": f"#{existing_scheme['colours']['secondary']}",
-            "tertiary": f"#{existing_scheme['colours']['tertiary']}",
+            "surface": f"#{existing_scheme.colours['surface']}",
+            "primary": f"#{existing_scheme.colours['primary']}",
+            "secondary": f"#{existing_scheme.colours['secondary']}",
+            "tertiary": f"#{existing_scheme.colours['tertiary']}",
         }
     )
 
@@ -78,11 +77,12 @@ def create_scheme_from_image(image_path: str) -> None:
 
     try:
         colors_dict = json.loads(result)
-        scheme = generate_scheme_from_hex(
-            colors_dict["surface"],
-            colors_dict["primary"],
-            colors_dict["secondary"],
-            colors_dict["tertiary"],
+        scheme = Scheme.generate_from_base_colors_hex(
+            flavor=os.path.basename(image_path),
+            surface=colors_dict["surface"],
+            primary=colors_dict["primary"],
+            secondary=colors_dict["secondary"],
+            tertiary=colors_dict["tertiary"],
         )
         save_custom_scheme(image_path, scheme)
 
@@ -90,16 +90,6 @@ def create_scheme_from_image(image_path: str) -> None:
         print("Error: Failed to parse colors from the color picker.")
         print("Raw output:", result)
         exit(1)
-
-
-def get_current_wallpaper() -> str:
-    return subprocess.run(
-        ["caelestia", "shell", "wallpaper", "get"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.strip("\n")
 
 
 def set_from_name(name: str) -> None:
@@ -127,11 +117,29 @@ def force_set_from_name(name: str) -> None:
 
     This can be used as a posthook but changes will not be applied to apps that only listen to wallpaper changes.
     """
-    template_path = get_custom_scheme_path(name)
-    with open(template_path, "r") as file_read:
-        scheme = json.load(file_read)
+    scheme = load_custom_scheme(name)
+    if scheme:
         with open(PATH_CAELESTIA_SCHEME, "w") as file_write:
-            json.dump(scheme, file_write, indent=2)
+            json.dump(scheme.to_json(), file_write, indent=2)
+    else:
+        print(f"Could not load custom scheme `{name}`. Aborting.")
+        exit(1)
+
+
+def get_current_wallpaper() -> str:
+    return subprocess.run(
+        ["caelestia", "shell", "wallpaper", "get"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout.strip("\n")
+
+
+def reload_wallpaper() -> None:
+    subprocess.run(
+        ["caelestia", "shell", "wallpaper", "set", get_current_wallpaper()],
+    )
 
 
 ## MAIN =======================================================================
@@ -139,13 +147,12 @@ if __name__ == "__main__":
     ## GENERATE FROM <PATH>
     if len(sys.argv) >= 3 and sys.argv[1] == "create-from-path":
         create_scheme_from_image(sys.argv[2])
-        force_set_from_name(sys.argv[2])
 
     ## GENERATE FROM WALLPAPER
     elif len(sys.argv) >= 2 and sys.argv[1] == "create-from-wp":
         wp_path = get_current_wallpaper()
         create_scheme_from_image(wp_path)
-        force_set_from_name(wp_path)
+        reload_wallpaper()  # Force Caelestia to reload scheme (only in manual scheme mode)
 
     elif len(sys.argv) >= 3 and sys.argv[1] == "set-from-name":
         force_set_from_name(sys.argv[2])
