@@ -87,67 +87,67 @@ $ON_SURFACE     track index
 $ON_SURFACE     track artist
 $ON_SURFACE     track album
 
-$ERROR      track missing
+$ERROR          track missing
 
 $ERROR          fav line
 $SECONDARY      folder line
 $SECONDARY      folder title
 
-$SECONDARY        playing highlight
-$ON_SECONDARY      track playing
-$ON_SECONDARY      time playing
-$ON_SECONDARY      index playing
-$ON_SECONDARY      artist playing
-$ON_SECONDARY      album playing
+$SECONDARY      playing highlight
+$ON_SECONDARY   track playing
+$ON_SECONDARY   time playing
+$ON_SECONDARY   index playing
+$ON_SECONDARY   artist playing
+$ON_SECONDARY   album playing
 
 $SECONDARY      select highlight
-$SECONDARY     gallery highlight
+$SECONDARY      gallery highlight
 
 $ON_SURFACE     column bar background
 
 # ---- Bottom Panel ----
 
-$CONTAINER        bottom panel
-$SECONDARY       buttons active
-$CONTAINER_HIGH    buttons off
-$SECONDARY       buttons over
+$CONTAINER      bottom panel
+$SECONDARY      buttons active
+$CONTAINER_HIGH buttons off
+$SECONDARY      buttons over
 
-$SECONDARY     playing time
-$SECONDARY     seek bar
-$CONTAINER_HIGH      seek bg
+$SECONDARY      playing time
+$SECONDARY      seek bar
+$CONTAINER_HIGH seek bg
 
-$CONTAINER_HIGH      volume bg
-$SECONDARY     volume bar
+$CONTAINER_HIGH volume bg
+$SECONDARY      volume bar
 
 $SECONDARY      scroll bar
 
-$CONTAINER_HIGH        mode off
-$SECONDARY     mode over
-$SECONDARY     mode on
+$CONTAINER_HIGH mode off
+$SECONDARY      mode over
+$SECONDARY      mode on
 
-$ON_SECONDARY          bottom title
+$ON_CONTAINER   bottom title
 
 # ---- Side Panel ----
 
 $SURFACE        side panel
 $ON_SURFACE     title info
 $ON_SURFACE     extra info
-$SURFACE      art border
+$SURFACE        art border
 
 # ---- MENU ----
 
 $CONTAINER      menu background
 $SECONDARY      menu highlight
-$SURFACE      menu border
-$ON_CONTAINER      menu text
-$CONTAINER_HIGH      menu disable text
-$ON_CONTAINER      menu icons
+$SURFACE        menu border
+$ON_CONTAINER   menu text
+$CONTAINER_HIGH menu disable text
+$ON_CONTAINER   menu icons
 
 # ---- Mini Mode ----
 
 $SURFACE        mini bg
 $SECONDARY      mini border
-$SECONDARY          mini text 1
+$SECONDARY      mini text 1
 
 # ---- Artist Info ----
 
@@ -174,10 +174,11 @@ $SECONDARY      box text border
 $ON_SURFACE     box button text normal
 $ON_PRIMARY     box button text highlight
 $SURFACE        box button background normal
-$ON_SECONDARY      box button background highlight
+$ON_SECONDARY   box button background highlight
 $SECONDARY      box button border
 "
 
-echo "$THEME" > "$TAUON_THEME_FILE"
+# tr -s ' '  -> removes the extra whitespace I use to make the script legible but would look unaligned once all the variables are replaced by hex values.
+echo "$THEME" | tr -s ' ' > "$TAUON_THEME_FILE"
 
 echo "Successfully generated Tauon theme."
