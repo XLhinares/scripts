@@ -87,10 +87,12 @@ $ON_SURFACE     track index
 $ON_SURFACE     track artist
 $ON_SURFACE     track album
 
+$CONTAINER      album line
+
 $ERROR          track missing
 
 $ERROR          fav line
-$SECONDARY      folder line
+$CONTAINER      folder line
 $SECONDARY      folder title
 
 $SECONDARY      playing highlight
@@ -178,7 +180,7 @@ $ON_SECONDARY   box button background highlight
 $SECONDARY      box button border
 "
 
-# tr -s ' '  -> removes the extra whitespace I use to make the script legible but would look unaligned once all the variables are replaced by hex values.
+# tr -s ' ' -> removes the extra whitespace I use to make the script legible but would look unaligned once all the variables are replaced by hex values.
 echo "$THEME" | tr -s ' ' > "$TAUON_THEME_FILE"
 
 echo "Successfully generated Tauon theme."
