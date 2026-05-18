@@ -1,3 +1,13 @@
+## 1.0.4
+
+    - tauon: changed folder line color
+- tauon: fix title color and code indentation
+- Tauon: much better scheming
+- scheme: add command to remove custom scheme
+- scheme: match caelestia format and add lightness slider
+- scheme: improve scheme generation and change location of custom schemes
+- palworld: fix wrong help script path
+
 ## 1.0.3
 
     - caelestia scheme: much improved color picker
